@@ -8,9 +8,9 @@ from tqdm import tqdm
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 
-parser.add_argument('--data_path', default='../CompCars/data/',
+parser.add_argument('--data_path', default='./datasets/CompCars/data/',
                     help='path to dataset')
-parser.add_argument('--annotation_path', default='annotation/',
+parser.add_argument('--annotation_path', default='./datasets/CompCars/annotation/',
                     help='path to save annotation')
 
 
