@@ -9,7 +9,7 @@ def train(model: torch.nn.Module,
           train_loader: torch.utils.data.DataLoader,
           criterion: torch.nn.Module,
           optimizer: torch.optim.Optimizer,
-          config, epoch) -> None:
+          config, epoch):
     """
     Model training function for one epoch
     :param model: model architecture
@@ -53,12 +53,13 @@ def train(model: torch.nn.Module,
     acc_val, acc_avg = acc_stat()
     loss_val, loss_avg = loss_stat()
     print('Train process of epoch: {} is done; \n loss: {:.4f}; acc: {:.2f}'.format(epoch, loss_avg, acc_avg))
+    return loss_avg, acc_avg
 
 
 def validation(model: torch.nn.Module,
                val_loader: torch.utils.data.DataLoader,
                criterion: torch.nn.Module,
-               epoch) -> None:
+               epoch):
     """
     Model validation function for one epoch
     :param model: model architecture
@@ -91,4 +92,4 @@ def validation(model: torch.nn.Module,
         acc_val, acc_avg = acc_stat()
         loss_val, loss_avg = loss_stat()
         print('Validation of epoch: {} is done; \n loss: {:.4f}; acc: {:.2f}'.format(epoch, loss_avg, acc_avg))
-        return acc_avg
+        return loss_avg, acc_avg

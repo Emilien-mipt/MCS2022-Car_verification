@@ -7,6 +7,7 @@ import sys
 import numpy as np
 import torch
 import yaml
+from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 import utils
@@ -41,6 +42,8 @@ def main(args: argparse.Namespace) -> None:
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
+    tb = SummaryWriter(outdir)
+
     train_loader, val_loader = get_dataloader.get_dataloaders(config)
 
     print("Loading model...")
@@ -55,8 +58,16 @@ def main(args: argparse.Namespace) -> None:
     # main process
     best_acc = 0.0
     for epoch in train_epoch:
-        train(net, train_loader, criterion, optimizer, config, epoch)
-        epoch_avg_acc = validation(net, val_loader, criterion, epoch)
+        avg_train_loss, avg_train_acc = train(net, train_loader, criterion, optimizer, config, epoch)
+        epoch_avg_loss, epoch_avg_acc = validation(net, val_loader, criterion, epoch)
+
+        cur_lr = optimizer.param_groups[0]["lr"]
+        tb.add_scalar("Learning rate", cur_lr, epoch + 1)
+        tb.add_scalar("Train Loss", avg_train_loss, epoch + 1)
+        tb.add_scalar("Train accuracy", avg_train_acc, epoch + 1)
+        tb.add_scalar("Val Loss", epoch_avg_loss, epoch + 1)
+        tb.add_scalar("Val accuracy score", epoch_avg_acc, epoch + 1)
+
         if epoch_avg_acc >= best_acc:
             utils.save_checkpoint(net, optimizer, scheduler, epoch, outdir)
             best_acc = epoch_avg_acc

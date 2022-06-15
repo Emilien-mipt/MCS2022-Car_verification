@@ -8,4 +8,4 @@ datasets/
 __pycache__/
 
 # weights
-experiments/
+*.pth
