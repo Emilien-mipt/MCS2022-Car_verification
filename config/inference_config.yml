@@ -1,6 +1,6 @@
-root: '../public_test/images/'
-test_list: '../public_test/images_w_boxes.csv'
-pairs_list: '../public_test/submission_list.csv'
+root: './datasets/public_test/images/'
+test_list: './datasets/public_test/images_w_boxes.csv'
+pairs_list: './datasets/public_test/submission_list.csv'
 batch_size: 256
 augmentations: 'default'
 augmentations_valid: 'default'

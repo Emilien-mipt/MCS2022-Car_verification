@@ -6,3 +6,6 @@ datasets/
 
 # pycache
 __pycache__/
+
+# weights
+experiments/
