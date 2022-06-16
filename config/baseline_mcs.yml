@@ -1,4 +1,4 @@
-exp_name: 'baseline_mcs'
+exp_name: 'baseline_efficientnet_b3'
 outdir: './experiments/'
 
 num_gpu: 1
@@ -10,14 +10,14 @@ dataset:
     seed: 42
     num_of_classes: 1716
     input_size: 224
-    batch_size: 256
+    batch_size: 128
     augmentations: 'default'
     augmentations_valid: 'default'
     num_workers: 16
 
 
 model:
-    arch: 'resnet50'
+    arch: 'efficientnet_b3'
 
 train:
     optimizer: 'SGD'
