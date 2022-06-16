@@ -2,6 +2,7 @@ import argparse
 import os
 import os.path as osp
 import random
+import shutil
 import sys
 
 import numpy as np
@@ -40,6 +41,8 @@ def main(args: argparse.Namespace) -> None:
     print("Savedir: {}".format(outdir))
     if not os.path.exists(outdir):
         os.makedirs(outdir)
+
+    shutil.copy2(args.cfg, outdir)
 
     tb = SummaryWriter(outdir)
 
