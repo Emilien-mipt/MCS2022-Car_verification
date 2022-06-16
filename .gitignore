@@ -1,0 +1,11 @@
+# Pycharm cache
+.idea/
+
+# data
+datasets/
+
+# pycache
+__pycache__/
+
+# weights
+*.pth
