@@ -36,7 +36,6 @@ def main(args: argparse.Namespace) -> None:
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = True
 
-
     outdir = osp.join(config.outdir, config.exp_name)
     print("Savedir: {}".format(outdir))
     if not os.path.exists(outdir):
@@ -47,18 +46,22 @@ def main(args: argparse.Namespace) -> None:
     train_loader, val_loader = get_dataloader.get_dataloaders(config)
 
     print("Loading model...")
-    net = models.load_model(config)
+    net = models.load_timm_model(config)
     if config.num_gpu > 1:
         net = torch.nn.DataParallel(net)
     print("Done.")
 
     criterion, optimizer, scheduler = utils.get_training_parameters(config, net)
-    train_epoch = tqdm(range(config.train.n_epoch), dynamic_ncols=True, desc='Epochs', position=0)
+    train_epoch = tqdm(
+        range(config.train.n_epoch), dynamic_ncols=True, desc="Epochs", position=0
+    )
 
     # main process
     best_acc = 0.0
     for epoch in train_epoch:
-        avg_train_loss, avg_train_acc = train(net, train_loader, criterion, optimizer, config, epoch)
+        avg_train_loss, avg_train_acc = train(
+            net, train_loader, criterion, optimizer, config, epoch
+        )
         epoch_avg_loss, epoch_avg_acc = validation(net, val_loader, criterion, epoch)
 
         cur_lr = optimizer.param_groups[0]["lr"]
@@ -76,9 +79,9 @@ def main(args: argparse.Namespace) -> None:
 
 def parse_arguments(argv):
     parser = argparse.ArgumentParser()
-    parser.add_argument('--cfg', type=str, default='', help='Path to config file.')
+    parser.add_argument("--cfg", type=str, default="", help="Path to config file.")
     return parser.parse_args(argv)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main(parse_arguments(sys.argv[1:]))
