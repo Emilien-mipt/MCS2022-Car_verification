@@ -1,4 +1,4 @@
-exp_name: 'baseline_efficientnetv2_rw_m'
+exp_name: 'resnet18_metric_learning'
 outdir: './experiments/'
 
 num_gpu: 1
@@ -17,7 +17,7 @@ dataset:
 
 
 model:
-    arch: 'efficientnetv2_rw_m'
+    arch: 'resnet18'
     embedding_size: 512
 
 train:
