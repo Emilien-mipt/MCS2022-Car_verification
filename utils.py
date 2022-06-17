@@ -57,6 +57,8 @@ def get_optimizer(config, net):
             momentum=config.train.momentum,
             weight_decay=config.train.weight_decay,
         )
+    elif config.train.optimizer == "Adam":
+        optimizer = torch.optim.Adam(params=net.parameters(), lr=lr, weight_decay=config.train.weight_decay)
     else:
         raise Exception("Unknown type of optimizer: {}".format(config.train.optimizer))
     return optimizer
@@ -114,3 +116,9 @@ def get_max_bbox(bboxes):
     bbox_sizes = [x[2] * x[3] for x in bboxes]
     max_bbox_index = np.argmax(bbox_sizes)
     return bboxes[max_bbox_index]
+
+
+# Adjust LR for each training batch during warm up
+def warm_up_lr(batch, num_batch_warm_up, init_lr, optimizer):
+    for params in optimizer.param_groups:
+        params["lr"] = batch * init_lr / num_batch_warm_up

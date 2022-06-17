@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from utils import AverageMeter
+from utils import AverageMeter, warm_up_lr
 
 
 def train(
@@ -11,17 +11,17 @@ def train(
     loss_func,
     optimizer: torch.optim.Optimizer,
     loss_optimizer: torch.optim.Optimizer,
+    lr,
     config,
     epoch,
 ):
     """
-    Model training function for one epoch
-
     :param model: model architecture
     :param train_loader: dataloader for batch generation
     :param loss_func:
     :param optimizer: selected optimizer for updating weights
     :param loss_optimizer:
+    :param lr:
     :param config: train process configuration
     :param epoch:
     :return: None
@@ -33,7 +33,14 @@ def train(
 
     train_iter = tqdm(train_loader, desc="Train", dynamic_ncols=True, position=1)
 
+    NUM_EPOCH_WARM_UP = config.train.n_epoch // 25
+    NUM_BATCH_WARM_UP = len(train_loader) * NUM_EPOCH_WARM_UP
+
     for step, (x, y) in enumerate(train_iter):
+        if (epoch + 1 <= NUM_EPOCH_WARM_UP) and (
+            step + 1 <= NUM_BATCH_WARM_UP
+        ):  # adjust LR for each training batch during warm up
+            warm_up_lr(step + 1, NUM_BATCH_WARM_UP, lr, optimizer)
         num_of_samples = x.shape[0]
         x = x.cuda().to(memory_format=torch.contiguous_format)
         y = y.cuda()

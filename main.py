@@ -71,9 +71,11 @@ def main(args: argparse.Namespace) -> None:
 
     # main process
     best_acc = 0.0
+    lr = config.train.learning_rate
+
     for epoch in train_epoch:
         avg_train_loss, avg_train_acc = train(
-            net, train_loader, loss_func, optimizer, loss_optimizer, config, epoch
+            net, train_loader, loss_func, optimizer, loss_optimizer, lr, config, epoch
         )
         epoch_avg_loss, epoch_avg_acc = validation(net, val_loader, loss_func, epoch)
 
