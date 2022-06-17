@@ -8,6 +8,7 @@ import sys
 import numpy as np
 import torch
 import yaml
+from pytorch_metric_learning import losses
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
@@ -38,6 +39,7 @@ def main(args: argparse.Namespace) -> None:
     torch.backends.cudnn.benchmark = True
 
     outdir = osp.join(config.outdir, config.exp_name)
+
     print("Savedir: {}".format(outdir))
     if not os.path.exists(outdir):
         os.makedirs(outdir)
@@ -59,13 +61,21 @@ def main(args: argparse.Namespace) -> None:
         range(config.train.n_epoch), dynamic_ncols=True, desc="Epochs", position=0
     )
 
+    ### pytorch-metric-learning stuff ###
+    loss_func = losses.SubCenterArcFaceLoss(
+        num_classes=config.dataset.num_of_classes,
+        embedding_size=config.model.embedding_size,
+    ).to("cuda")
+    _, loss_optimizer, loss_scheduler = utils.get_training_parameters(config, loss_func)
+    ### pytorch-metric-learning stuff ###
+
     # main process
     best_acc = 0.0
     for epoch in train_epoch:
         avg_train_loss, avg_train_acc = train(
-            net, train_loader, criterion, optimizer, config, epoch
+            net, train_loader, loss_func, optimizer, loss_optimizer, config, epoch
         )
-        epoch_avg_loss, epoch_avg_acc = validation(net, val_loader, criterion, epoch)
+        epoch_avg_loss, epoch_avg_acc = validation(net, val_loader, loss_func, epoch)
 
         cur_lr = optimizer.param_groups[0]["lr"]
         tb.add_scalar("Learning rate", cur_lr, epoch + 1)
@@ -75,9 +85,10 @@ def main(args: argparse.Namespace) -> None:
         tb.add_scalar("Val accuracy score", epoch_avg_acc, epoch + 1)
 
         if epoch_avg_acc >= best_acc:
-            utils.save_checkpoint(net, optimizer, scheduler, epoch, outdir)
+            utils.save_checkpoint(net, epoch, outdir)
             best_acc = epoch_avg_acc
         scheduler.step()
+        loss_scheduler.step()
 
 
 def parse_arguments(argv):

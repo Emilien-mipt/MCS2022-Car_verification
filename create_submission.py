@@ -39,8 +39,8 @@ def main(args: argparse.Namespace) -> None:
         name = k.replace("module.", "")
         new_state_dict[name] = v
 
+    model.fc = torch.nn.Identity()
     model.load_state_dict(new_state_dict)
-    model.classifier = torch.nn.Identity()
     model.eval()
     model.cuda()
     print("Weights are loaded, fc layer is deleted")
