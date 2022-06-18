@@ -2,29 +2,28 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from utils import AverageMeter, warm_up_lr
+from losses.circle_loss import convert_label_to_similarity
+from utils import AverageMeter
 
 
 def train(
     model: torch.nn.Module,
+    criterion,
+    head_criterion,
     train_loader: torch.utils.data.DataLoader,
-    loss_func,
     optimizer: torch.optim.Optimizer,
-    loss_optimizer: torch.optim.Optimizer,
-    lr,
     config,
     epoch,
 ):
     """
     :param model: model architecture
+    :param criterion:
+    :param head_criterion:
     :param train_loader: dataloader for batch generation
-    :param loss_func:
     :param optimizer: selected optimizer for updating weights
-    :param loss_optimizer:
-    :param lr:
     :param config: train process configuration
     :param epoch:
-    :return: None
+    :return: tuple(float, float): Avg loss and avg accuracy
     """
     model.train()
 
@@ -33,36 +32,63 @@ def train(
 
     train_iter = tqdm(train_loader, desc="Train", dynamic_ncols=True, position=1)
 
-    NUM_EPOCH_WARM_UP = config.train.n_epoch // 25
-    NUM_BATCH_WARM_UP = len(train_loader) * NUM_EPOCH_WARM_UP
+    train_dataset_size = len(train_loader.dataset)
 
-    for step, (x, y) in enumerate(train_iter):
-        if (epoch + 1 <= NUM_EPOCH_WARM_UP) and (
-            step + 1 <= NUM_BATCH_WARM_UP
-        ):  # adjust LR for each training batch during warm up
-            warm_up_lr(step + 1, NUM_BATCH_WARM_UP, lr, optimizer)
-        num_of_samples = x.shape[0]
-        x = x.cuda().to(memory_format=torch.contiguous_format)
-        y = y.cuda()
+    warm_up = 0.1  # We start from the 0.1*lrRate
+    warm_iteration = (
+        round(train_dataset_size / config.dataset.batch_size) * config.train.warm_epoch
+    )  # first 5 epoch
+
+    for step, (inputs, labels) in enumerate(train_iter):
+        now_batch_size = inputs.shape[0]
+        inputs = inputs.cuda().to(memory_format=torch.contiguous_format)
+        labels = labels.cuda()
 
         optimizer.zero_grad()
-        loss_optimizer.zero_grad()
 
-        embeddings = model(x)
-        loss = loss_func(embeddings, y)
+        outputs = model(inputs)
+
+        head = config.model.head
+
+        if head:
+            logits, ff = outputs
+            fnorm = torch.norm(ff, p=2, dim=1, keepdim=True)
+            ff = ff.div(fnorm.expand_as(ff))
+            loss = criterion(logits, labels)
+            _, preds = torch.max(logits.data, 1)
+            if (
+                (head == "arcface")
+                or (head == "cosface")
+                or (head == "instance")
+                or (head == "sphere")
+            ):
+                loss += head_criterion(ff, labels) / now_batch_size
+            elif (head == "lifted") or (head == "contrast"):
+                loss += head_criterion(ff, labels)
+            elif head == "circle":
+                loss += (
+                    head_criterion(*convert_label_to_similarity(ff, labels))
+                    / now_batch_size
+                )
+            else:
+                raise ValueError("Wrong head! Please check the config file")
+        else:
+            _, preds = torch.max(outputs.data, 1)
+            loss = criterion(outputs, labels)
+
+        # backward
+        if epoch < config.train.warm_epoch:
+            warm_up = min(1.0, warm_up + 0.9 / warm_iteration)
+            loss = loss * warm_up
+
         loss.backward()
         optimizer.step()
-        loss_optimizer.step()
 
-        loss_stat.update(loss.detach().cpu().item(), num_of_samples)
+        loss_stat.update(loss.detach().cpu().item(), now_batch_size)
 
-        out = loss_func.get_logits(embeddings)
-        scores = torch.softmax(out, dim=1).detach().cpu().numpy()
-        predict = np.argmax(scores, axis=1)
-        gt = y.detach().cpu().numpy()
-
-        acc = np.mean(gt == predict)
-        acc_stat.update(acc, num_of_samples)
+        gt = labels.detach().cpu().numpy()
+        acc = np.mean(gt == preds)
+        acc_stat.update(acc, now_batch_size)
 
         if step % config.train.freq_vis == 0 and not step == 0:
             acc_val, acc_avg = acc_stat()
@@ -84,17 +110,22 @@ def train(
 
 
 def validation(
-    model: torch.nn.Module, val_loader: torch.utils.data.DataLoader, loss_func, epoch
+    model: torch.nn.Module,
+    criterion,
+    head_criterion,
+    val_loader: torch.utils.data.DataLoader,
+    config,
+    epoch,
 ):
     """
     Model validation function for one epoch
-
-
     :param model: model architecture
+    :param criterion:
+    :param head_criterion:
     :param val_loader: dataloader for batch generation
-    :param loss_func:
+    :param config:
     :param epoch:
-    :return: float: avg acc
+    :return: tuple(float, float): Avg loss and avg accuracy
     """
     loss_stat = AverageMeter("Loss")
     acc_stat = AverageMeter("Acc.")
@@ -103,28 +134,60 @@ def validation(
         model.eval()
         val_iter = tqdm(val_loader, desc="Val", dynamic_ncols=True, position=2)
 
-        for step, (x, y) in enumerate(val_iter):
-            num_of_samples = x.shape[0]
-            x = x.cuda().to(memory_format=torch.contiguous_format)
-            y = y.cuda()
+        for step, (inputs, labels) in enumerate(val_iter):
+            now_batch_size = inputs.shape[0]
+            inputs = inputs.cuda().to(memory_format=torch.contiguous_format)
+            labels = labels.cuda()
 
-            embeddings = model(x)
-            loss = loss_func(embeddings, y)
+            outputs = model(inputs)
 
-            loss_stat.update(loss.detach().cpu().item(), num_of_samples)
+            head = config.model.head
 
-            out = loss_func.get_logits(embeddings)
-            scores = torch.softmax(out, dim=1).detach().cpu().numpy()
-            predict = np.argmax(scores, axis=1)
-            gt = y.detach().cpu().numpy()
+            if head:
+                logits, ff = outputs
+                fnorm = torch.norm(ff, p=2, dim=1, keepdim=True)
+                ff = ff.div(fnorm.expand_as(ff))
+                loss = criterion(logits, labels)
+                _, preds = torch.max(logits.data, 1)
+                if (
+                    (head == "arcface")
+                    or (head == "cosface")
+                    or (head == "instance")
+                    or (head == "sphere")
+                ):
+                    loss += head_criterion(ff, labels) / now_batch_size
+                elif (head == "lifted") or (head == "contrast"):
+                    loss += head_criterion(ff, labels)
+                elif head == "circle":
+                    loss += (
+                        head_criterion(*convert_label_to_similarity(ff, labels))
+                        / now_batch_size
+                    )
+                else:
+                    raise ValueError("Wrong head! Please check the config file")
+            else:
+                _, preds = torch.max(outputs.data, 1)
+                loss = criterion(outputs, labels)
 
-            acc = np.mean(gt == predict)
-            acc_stat.update(acc, num_of_samples)
+            loss_stat.update(loss.detach().cpu().item(), now_batch_size)
+
+            gt = labels.detach().cpu().numpy()
+            acc = np.mean(gt == preds)
+            acc_stat.update(acc, now_batch_size)
+
+            if step % config.train.freq_vis == 0 and not step == 0:
+                acc_val, acc_avg = acc_stat()
+                loss_val, loss_avg = loss_stat()
+                print(
+                    "Epoch: {}; step: {}; loss: {:.4f}; acc: {:.2f}".format(
+                        epoch, step, loss_avg, acc_avg
+                    )
+                )
 
         acc_val, acc_avg = acc_stat()
         loss_val, loss_avg = loss_stat()
         print(
-            "Validation of epoch: {} is done; \n loss: {:.4f}; acc: {:.2f}".format(
+            "Train process of epoch: {} is done; \n loss: {:.4f}; acc: {:.2f}".format(
                 epoch, loss_avg, acc_avg
             )
         )

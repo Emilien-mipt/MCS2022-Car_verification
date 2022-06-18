@@ -3,8 +3,12 @@ from collections import OrderedDict, namedtuple
 
 import numpy as np
 import torch
+from pytorch_metric_learning import losses
 from torch import nn
 from torch.nn import functional as F
+
+from losses.circle_loss import CircleLoss
+from losses.instance_loss import InstanceLoss
 
 
 def convert_dict_to_tuple(dictionary):
@@ -58,7 +62,9 @@ def get_optimizer(config, net):
             weight_decay=config.train.weight_decay,
         )
     elif config.train.optimizer == "Adam":
-        optimizer = torch.optim.Adam(params=net.parameters(), lr=lr, weight_decay=config.train.weight_decay)
+        optimizer = torch.optim.Adam(
+            params=net.parameters(), lr=lr, weight_decay=config.train.weight_decay
+        )
     else:
         raise Exception("Unknown type of optimizer: {}".format(config.train.optimizer))
     return optimizer
@@ -87,6 +93,36 @@ def get_training_parameters(config, net):
     optimizer = get_optimizer(config, net)
     scheduler = get_scheduler(config, optimizer)
     return criterion, optimizer, scheduler
+
+
+def get_head(config):
+    numer_classes = config.dataset.num_of_classes
+    embedding_size = config.model.embedding_size
+    if config.model.head == "arcface":
+        criterion = losses.ArcFaceLoss(
+            num_classes=numer_classes, embedding_size=embedding_size
+        )
+    elif config.model.head == "cosface":
+        criterion = losses.CosFaceLoss(
+            num_classes=embedding_size, embedding_size=embedding_size
+        )
+    elif config.model.head == "circle":
+        criterion = CircleLoss(
+            m=0.25, gamma=32
+        )  # gamma = 64 may lead to a better result.
+    elif config.model.head == "lifted":
+        criterion = losses.GeneralizedLiftedStructureLoss(neg_margin=1, pos_margin=0)
+    elif config.model.head == "contrast":
+        criterion = losses.ContrastiveLoss(pos_margin=0, neg_margin=1)
+    elif config.model.head == "instance":
+        criterion = InstanceLoss(gamma=32)
+    elif config.model.head == "sphere":
+        criterion = losses.SphereFaceLoss(
+            num_classes=embedding_size, embedding_size=embedding_size, margin=4
+        )
+    else:
+        raise ValueError("No such criterion!")
+    return criterion
 
 
 class AverageMeter(object):
