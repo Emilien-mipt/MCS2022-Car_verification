@@ -3,12 +3,9 @@ from collections import OrderedDict, namedtuple
 
 import numpy as np
 import torch
-from pytorch_metric_learning import losses
 from torch import nn
 from torch.nn import functional as F
-
-from losses.circle_loss import CircleLoss
-from losses.instance_loss import InstanceLoss
+from torchvision import datasets
 
 
 def convert_dict_to_tuple(dictionary):
@@ -95,36 +92,6 @@ def get_training_parameters(config, net):
     return criterion, optimizer, scheduler
 
 
-def get_head(config):
-    numer_classes = config.dataset.num_of_classes
-    embedding_size = config.model.embedding_size
-    if config.model.head == "arcface":
-        criterion = losses.ArcFaceLoss(
-            num_classes=numer_classes, embedding_size=embedding_size
-        )
-    elif config.model.head == "cosface":
-        criterion = losses.CosFaceLoss(
-            num_classes=embedding_size, embedding_size=embedding_size
-        )
-    elif config.model.head == "circle":
-        criterion = CircleLoss(
-            m=0.25, gamma=32
-        )  # gamma = 64 may lead to a better result.
-    elif config.model.head == "lifted":
-        criterion = losses.GeneralizedLiftedStructureLoss(neg_margin=1, pos_margin=0)
-    elif config.model.head == "contrast":
-        criterion = losses.ContrastiveLoss(pos_margin=0, neg_margin=1)
-    elif config.model.head == "instance":
-        criterion = InstanceLoss(gamma=32)
-    elif config.model.head == "sphere":
-        criterion = losses.SphereFaceLoss(
-            num_classes=embedding_size, embedding_size=embedding_size, margin=4
-        )
-    else:
-        raise ValueError("No such criterion!")
-    return criterion
-
-
 class AverageMeter(object):
     """Computes and stores the average and current value"""
 
@@ -154,7 +121,23 @@ def get_max_bbox(bboxes):
     return bboxes[max_bbox_index]
 
 
-# Adjust LR for each training batch during warm up
-def warm_up_lr(batch, num_batch_warm_up, init_lr, optimizer):
-    for params in optimizer.param_groups:
-        params["lr"] = batch * init_lr / num_batch_warm_up
+class DGFolder(datasets.ImageFolder):
+    def __init__(self, root, transform):
+        super(DGFolder, self).__init__(root, transform)
+        targets = np.asarray([s[1] for s in self.samples])
+        self.targets = targets
+        self.img_num = len(self.samples)
+        print(self.img_num)
+
+    def __getitem__(self, index):
+        path, target = self.samples[index]
+        sample1 = self.loader(path)
+        sample2 = sample1
+        if self.transform is not None:
+            sample1 = self.transform(sample1)
+            sample2 = self.transform(sample2)
+
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        return sample1, sample2, target
