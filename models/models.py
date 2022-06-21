@@ -260,6 +260,32 @@ class ft_net_dense(nn.Module):
         return x
 
 
+# Define the EfficientNetv2
+class EffNetv2(nn.Module):
+    def __init__(self, class_num, droprate=0.5, circle=False, pretrained=False, linear_num=512):
+        super().__init__()
+        model_ft = timm.create_model('efficientnetv2_rw_s', pretrained=pretrained)
+        # avg pooling to global pooling
+        # model_ft.avgpool = nn.AdaptiveAvgPool2d((1,1))
+        model_ft.head = nn.Sequential()  # save memory
+        model_ft.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        model_ft.classifier = nn.Sequential()
+        final_in_features = self.model_ft.classifier.in_features
+        self.model = model_ft
+        self.circle = circle
+        self.classifier = ClassBlock(
+            final_in_features, class_num, droprate, linear=linear_num, return_f=circle
+        )
+
+    def forward(self, x):
+        # x = self.model.forward_features(x)
+        x = self.model.extract_features(x)
+        x = self.model.avgpool(x)
+        x = x.view(x.size(0), x.size(1))
+        x = self.classifier(x)
+        return x
+
+
 # Define the Efficient-b4-based Model
 class ft_net_efficient(nn.Module):
     def __init__(self, class_num, droprate=0.5, circle=False, linear_num=512):

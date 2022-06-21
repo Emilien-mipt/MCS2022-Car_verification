@@ -26,10 +26,19 @@ import yaml
 from data import dataset
 from losses.circle_loss import CircleLoss, convert_label_to_similarity
 from losses.instance_loss import InstanceLoss
-from models.models import (PCB, ft_net, ft_net_convnext, ft_net_dense,
-                           ft_net_efficient, ft_net_hr, ft_net_NAS,
-                           ft_net_swin)
+from models.models import (
+    PCB,
+    ft_net,
+    ft_net_convnext,
+    ft_net_dense,
+    ft_net_efficient,
+    ft_net_hr,
+    ft_net_NAS,
+    ft_net_swin,
+    EffNetv2,
+)
 from random_erasing import RandomErasing
+
 # from PIL import Image
 from utils import DGFolder
 
@@ -45,7 +54,9 @@ except ImportError:  # will be 3.x series
     )
 
 from pytorch_metric_learning import (  # pip install pytorch-metric-learning
-    losses, miners)
+    losses,
+    miners,
+)
 
 ######################################################################
 # Options
@@ -109,6 +120,7 @@ parser.add_argument(
     "--use_swin", action="store_true", help="use swin transformer 224x224"
 )
 parser.add_argument("--use_efficient", action="store_true", help="use efficientnet-b4")
+parser.add_argument("--use_efficientv2", action="store_true", help="use EffNetv2")
 parser.add_argument("--use_NAS", action="store_true", help="use NAS")
 parser.add_argument("--use_hr", action="store_true", help="use hrNet")
 parser.add_argument("--use_convnext", action="store_true", help="use ConvNext")
@@ -156,13 +168,14 @@ else:
     h, w = 224, 224
 
 transform_train_list = [
-    transforms.RandomResizedCrop(size=(h, w)),
-    # transforms.Resize((h, w), interpolation=3),
-    # transforms.Pad(10),
-    transforms.RandomHorizontalFlip(),
-    transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-]
+        #transforms.RandomResizedCrop(size=128, scale=(0.75,1.0), ratio=(0.75,1.3333), interpolation=3), #Image.BICUBIC)
+        transforms.Resize((h, w), interpolation=3),
+        transforms.Pad(10),
+        transforms.RandomCrop((h, w)),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ]
 
 transform_val_list = [
     transforms.RandomResizedCrop(size=(h, w)),  # Image.BICUBIC
@@ -206,7 +219,7 @@ if opt.train_all:
 image_datasets = {
     "train": dataset.CarsDataset(
         root=data_dir,
-        annotation_file="./datasets/CompCars/annotation/train.txt",
+        annotation_file="./datasets/CompCars/annotation/train_full.txt",
         transforms=data_transforms["train"],
     ),
     "val": dataset.CarsDataset(
@@ -570,6 +583,13 @@ return_feature = (
     or opt.lifted
     or opt.sphere
 )
+if opt.use_efficientv2:
+    model = EffNetv2(
+        class_num=number_of_classes,
+        droprate=opt.droprate,
+        circle=return_feature,
+        linear_num=opt.linear_num,
+    )
 
 if opt.use_dense:
     model = ft_net_dense(
