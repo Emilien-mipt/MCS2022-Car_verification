@@ -90,6 +90,7 @@ class MCSNet(nn.Module):
         return logits
 
     def extract_features(self, x):
+        print("Extract features...")
         batch_size = x.shape[0]
         x = self.backbone(x)
         x = self.pooling(x).view(batch_size, -1)
@@ -98,5 +99,6 @@ class MCSNet(nn.Module):
             x = self.dropout(x)
             x = self.fc(x)
             x = self.bn(x)
+        print("Features have been extracted!")
 
         return x

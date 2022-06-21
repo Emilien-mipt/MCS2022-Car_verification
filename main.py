@@ -54,7 +54,6 @@ def main(args: argparse.Namespace) -> None:
         "pretrained": config.model.pretrained,
         "use_fc": config.model.use_fc,
         "fc_dim": config.model.fc_dim,
-        "dropout": config.model.dropout,
         "loss_module": config.model.loss_module,
         "s": config.model.s,
         "margin": config.model.margin,
