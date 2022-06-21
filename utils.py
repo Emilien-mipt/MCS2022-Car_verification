@@ -87,6 +87,12 @@ def get_scheduler(config, optimizer):
             step_size=config.train.lr_scheduler.step_size,
             gamma=config.train.lr_scheduler.gamma,
         )
+    elif config.train.lr_scheduler.name == "MultiStepLR":
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(
+            optimizer,
+            milestones=config.train.lr_scheduler.milestones,
+            gamma=config.train.lr_scheduler.gamma,
+        )
     else:
         raise Exception(
             "Unknown type of lr schedule: {}".format(config.train.lr_schedule)
