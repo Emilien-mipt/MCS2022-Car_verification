@@ -51,8 +51,7 @@ class CarsDataset(data.Dataset):
         ):
             img = img[y1:y2, x1:x2]
 
-        img = Image.fromarray(img)
-        img = self.transforms(img)
+        img = self.transforms(image=img)["image"]
 
         if self.is_inference:
             return img

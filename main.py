@@ -68,7 +68,11 @@ def main(args: argparse.Namespace) -> None:
     criterion = torch.nn.CrossEntropyLoss().to("cuda")
 
     no_decay_parameters, decay_parameters = add_weight_decay(net)
-    optimizer = get_optimizer(config, decay_parameters=decay_parameters, no_decay_parameters=no_decay_parameters)
+    optimizer = get_optimizer(
+        config,
+        decay_parameters=decay_parameters,
+        no_decay_parameters=no_decay_parameters,
+    )
 
     scheduler = get_scheduler(config, optimizer)
 
@@ -93,9 +97,17 @@ def main(args: argparse.Namespace) -> None:
         tb.add_scalar("Train accuracy", avg_train_acc, epoch + 1)
         tb.add_scalar("Train Prec@5", avg_train_top5, epoch + 1)
 
-        if not config.train.debug:  # If debug mode, do not validate
+        if (
+            config.train.full_training or config.train.debug
+        ):  # If training on full data or debug mode, do not validate
+            utils.save_checkpoint(net, config.model.model_name, epoch, outdir)
+        else:
             epoch_avg_loss, epoch_avg_acc, avg_val_top5 = validation(
-                model=net, val_loader=val_loader, criterion=criterion, epoch=epoch, device=device
+                model=net,
+                val_loader=val_loader,
+                criterion=criterion,
+                epoch=epoch,
+                device=device,
             )
             tb.add_scalar("Val Loss", epoch_avg_loss, epoch + 1)
             tb.add_scalar("Val accuracy score", epoch_avg_acc, epoch + 1)
