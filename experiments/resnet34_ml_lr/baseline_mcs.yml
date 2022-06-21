@@ -1,4 +1,4 @@
-exp_name: 'resnet50_arcface'
+exp_name: 'resnet34_ml_lr'
 outdir: './experiments/'
 
 num_gpu: 1
@@ -11,14 +11,14 @@ dataset:
     seed: 42
     num_of_classes: 1716
     input_size: 224
-    batch_size: 128
+    batch_size: 256
     augmentations: 'default'
     augmentations_valid: 'default'
     num_workers: 16
 
 
 model:
-    model_name: 'resnet50'
+    model_name: 'resnet34'
     pretrained: True
     use_fc: True
     fc_dim: 256
