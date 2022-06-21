@@ -1,6 +1,15 @@
+import random
+
+import numpy as np
 import torch
 
 from . import augmentations, dataset
+
+
+def seed_worker(worker_id):
+    worker_seed = torch.initial_seed() % 2**32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
 
 
 def get_dataloaders(config):
@@ -17,12 +26,17 @@ def get_dataloaders(config):
         debug_mode=config.train.debug,
     )
 
+    g = torch.Generator()
+    g.manual_seed(0)
+
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=config.dataset.batch_size,
         shuffle=True,
         num_workers=config.dataset.num_workers,
         pin_memory=True,
+        worker_init_fn=seed_worker,
+        generator=g,
         drop_last=True,
     )
 
