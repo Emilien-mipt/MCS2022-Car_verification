@@ -13,8 +13,8 @@ import utils
 from data import get_dataloader
 from models.model import MCSNet
 from train import train, validation
-from utils import (add_weight_decay, convert_dict_to_tuple, get_optimizer, get_scheduler,
-                   set_seed)
+from utils import (add_weight_decay, convert_dict_to_tuple, get_optimizer,
+                   get_scheduler, set_seed)
 
 
 def main(args: argparse.Namespace) -> None:
