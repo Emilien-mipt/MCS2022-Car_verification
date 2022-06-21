@@ -96,9 +96,9 @@ class MCSNet(nn.Module):
         x = self.pooling(x).view(batch_size, -1)
 
         if self.use_fc:
-            x = self.dropout(x)
             x = self.fc(x)
             x = self.bn(x)
+            x = self.dropout(x)
         print("Features have been extracted!")
 
         return x
