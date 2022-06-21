@@ -1,4 +1,4 @@
-exp_name: 'metric_learning_resnet18_new'
+exp_name: 'ibn_arcface'
 outdir: './experiments/'
 
 num_gpu: 1

@@ -5,7 +5,6 @@ from collections import OrderedDict
 
 import numpy as np
 import pandas as pd
-import timm
 import torch
 import yaml
 from sklearn.preprocessing import normalize
@@ -14,6 +13,8 @@ from tqdm import tqdm
 from data.augmentations import get_val_aug
 from data.dataset import CarsDataset
 from utils import convert_dict_to_tuple
+
+from models.models import ft_net
 
 
 def main(args: argparse.Namespace) -> None:
@@ -27,12 +28,15 @@ def main(args: argparse.Namespace) -> None:
 
     # getting model and checkpoint
     print("Creating model and loading checkpoint")
-    model = timm.create_model(
-        model_name=exp_cfg.model.arch,
-        pretrained=False,
-        num_classes=exp_cfg.dataset.num_of_classes,
+    model = ft_net(
+        exp_cfg.dataset.num_of_classes,
+        droprate=0,
+        stride=2,
+        circle=True,
+        ibn=True,
+        linear_num=512,
     )
-    checkpoint = torch.load(args.checkpoint_path, map_location="cuda")["state_dict"]
+    checkpoint = torch.load(args.checkpoint_path, map_location="cuda")
 
     new_state_dict = OrderedDict()
     for k, v in checkpoint.items():
@@ -63,7 +67,7 @@ def main(args: argparse.Namespace) -> None:
     with torch.no_grad():
         for i, images in tqdm(enumerate(test_loader, 0), total=len(test_loader)):
             images = images.to("cuda")
-            outputs = model(images)
+            x, outputs = model(images)
             outputs = outputs.data.cpu().numpy()
 
             if i == 0:
