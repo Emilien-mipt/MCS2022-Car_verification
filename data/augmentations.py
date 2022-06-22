@@ -61,7 +61,7 @@ def get_train_aug(config):
 
 def get_val_aug(config):
     if config.dataset.augmentations_valid == "default":
-        val_augs = tv.transforms.Compose(
+        val_augs = A.Compose(
             [
                 A.Resize(height=256, width=256),
                 A.CenterCrop(
