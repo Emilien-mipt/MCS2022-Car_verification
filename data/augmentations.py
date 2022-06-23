@@ -7,13 +7,13 @@ STD = [0.229, 0.224, 0.225]
 
 
 def get_train_aug(config):
+    h = config.dataset.input_size
+    w = config.dataset.input_size
+    print(f"Input size for training: ({h}, {w})")
     if config.dataset.augmentations == "default":
         train_augs = tv.transforms.Compose(
             [
-                A.RandomResizedCrop(
-                    height=config.dataset.input_size, width=config.dataset.input_size
-                ),
-                # tv.transforms.CenterCrop(config.dataset.input_size),
+                A.Resize(height=h, width=w),
                 A.HorizontalFlip(),
                 A.Normalize(mean=MEAN, std=STD),
                 ToTensorV2(),
@@ -22,9 +22,7 @@ def get_train_aug(config):
     elif config.dataset.augmentations == "complex":
         train_augs = A.Compose(
             [
-                A.RandomResizedCrop(
-                    height=config.dataset.input_size, width=config.dataset.input_size
-                ),
+                A.Resize(height=h, width=w),
                 A.HorizontalFlip(),
                 A.OneOf(
                     [
@@ -60,13 +58,13 @@ def get_train_aug(config):
 
 
 def get_val_aug(config):
+    h = config.dataset.input_size
+    w = config.dataset.input_size
+    print(f"Input size for validation: ({h}, {w})")
     if config.dataset.augmentations_valid == "default":
         val_augs = A.Compose(
             [
-                A.Resize(height=256, width=256),
-                A.CenterCrop(
-                    height=config.dataset.input_size, width=config.dataset.input_size
-                ),
+                A.Resize(height=h, width=w),
                 A.Normalize(mean=MEAN, std=STD),
                 ToTensorV2(),
             ]

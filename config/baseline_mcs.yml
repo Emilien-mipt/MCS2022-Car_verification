@@ -1,8 +1,8 @@
-exp_name: 'efficientnetv2_rw_s_arcface'
+exp_name: 'efficientnetv2_rw_s_arcface_nocrop'
 outdir: './experiments/'
 
 num_gpu: 1
-gpu_id: 1
+gpu_id: 0
 
 dataset:
     root: './datasets/CompCars/data/image/'
