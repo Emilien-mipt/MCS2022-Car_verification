@@ -36,6 +36,7 @@ from models.models import (
     ft_net_NAS,
     ft_net_swin,
     EffNetv2,
+    VitTransformer
 )
 from random_erasing import RandomErasing
 
@@ -58,6 +59,8 @@ from pytorch_metric_learning import (  # pip install pytorch-metric-learning
     miners,
 )
 
+from torch.utils.tensorboard import SummaryWriter
+
 ######################################################################
 # Options
 # --------
@@ -74,6 +77,7 @@ parser.add_argument(
     help="training dir path",
 )
 parser.add_argument("--train_all", action="store_true", help="use all training data")
+parser.add_argument("--optimizer", default="sgd", type=str, help="choose optimizer")
 parser.add_argument("--batchsize", default=32, type=int, help="batchsize")
 parser.add_argument(
     "--color_jitter", action="store_true", help="use color jitter in training"
@@ -101,6 +105,7 @@ parser.add_argument(
     help="use float16 instead of float32, which will save about 50% memory",
 )
 parser.add_argument("--cosine", action="store_true", help="use cosine lrRate")
+parser.add_argument("--cool_lr", action="store_true", help="use cosine lrRate")
 parser.add_argument(
     "--FSGD",
     action="store_true",
@@ -124,6 +129,7 @@ parser.add_argument("--use_efficientv2", action="store_true", help="use EffNetv2
 parser.add_argument("--use_NAS", action="store_true", help="use NAS")
 parser.add_argument("--use_hr", action="store_true", help="use hrNet")
 parser.add_argument("--use_convnext", action="store_true", help="use ConvNext")
+parser.add_argument("--use_vit", action="store_true", help="use ViT transformers")
 parser.add_argument("--ibn", action="store_true", help="use resnet+ibn")
 parser.add_argument("--PCB", action="store_true", help="use PCB+ResNet50")
 # loss
@@ -168,16 +174,16 @@ else:
     h, w = 224, 224
 
 transform_train_list = [
-        #transforms.RandomResizedCrop(size=128, scale=(0.75,1.0), ratio=(0.75,1.3333), interpolation=3), #Image.BICUBIC)
         transforms.Resize((h, w), interpolation=3),
-        transforms.Pad(10),
-        transforms.RandomCrop((h, w)),
+        # transforms.Pad(10),
+        # transforms.RandomCrop((h, w)),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ]
 
 transform_val_list = [
+    transforms.Resize(size=(384, 192), interpolation=3),
     transforms.RandomResizedCrop(size=(h, w)),  # Image.BICUBIC
     transforms.ToTensor(),
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
@@ -289,7 +295,7 @@ def fliplr(img):
     return img_flip
 
 
-def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
+def train_model(model, criterion, optimizer, scheduler, tb, num_epochs=25):
     since = time.time()
 
     # best_model_wts = model.state_dict()
@@ -500,6 +506,13 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             epoch_loss = running_loss / dataset_sizes[phase]
             epoch_acc = running_corrects / dataset_sizes[phase]
 
+            tb.add_scalar("Train Loss", epoch_loss, epoch + 1)
+            tb.add_scalar("Train accuracy", epoch_acc, epoch + 1)
+
+            cur_lr = optimizer.param_groups[0]["lr"]
+            print(f"Current Learning Rate: {cur_lr}")
+            tb.add_scalar("Learning rate", cur_lr, epoch + 1)
+
             print("{} Loss: {:.4f} Acc: {:.4f}".format(phase, epoch_loss, epoch_acc))
 
             y_loss[phase].append(epoch_loss)
@@ -507,7 +520,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             # deep copy the model
             if phase == "val":
                 last_model_wts = model.state_dict()
-                if epoch % 10 == 0:
+                if epoch % 3 == 0:
                     save_network(model, epoch)
                 draw_curve(epoch)
             if phase == "train":
@@ -540,7 +553,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
 x_epoch = []
 fig = plt.figure()
 ax0 = fig.add_subplot(121, title="loss")
-ax1 = fig.add_subplot(122, title="top1err")
+ax1 = fig.add_subplot(122, title="accuracy")
 
 
 def draw_curve(current_epoch):
@@ -584,14 +597,27 @@ return_feature = (
     or opt.sphere
 )
 if opt.use_efficientv2:
+    print("EffNetv2!")
     model = EffNetv2(
         class_num=number_of_classes,
         droprate=opt.droprate,
         circle=return_feature,
+        pretrained=True,
         linear_num=opt.linear_num,
     )
 
-if opt.use_dense:
+elif opt.use_vit:
+    print("ViT transforemrs!")
+    model = VitTransformer(
+        number_of_classes,
+        opt.droprate,
+        circle=return_feature,
+        linear_num=opt.linear_num,
+        pretrained=True,
+    )
+
+elif opt.use_dense:
+    print("DenseNet!")
     model = ft_net_dense(
         number_of_classes,
         opt.droprate,
@@ -600,8 +626,10 @@ if opt.use_dense:
         linear_num=opt.linear_num,
     )
 elif opt.use_NAS:
+    print("NAS!")
     model = ft_net_NAS(number_of_classes, opt.droprate, linear_num=opt.linear_num)
 elif opt.use_swin:
+    print("Swin!")
     model = ft_net_swin(
         number_of_classes,
         opt.droprate,
@@ -610,6 +638,7 @@ elif opt.use_swin:
         linear_num=opt.linear_num,
     )
 elif opt.use_efficient:
+    print("EffNet!")
     model = ft_net_efficient(
         number_of_classes,
         opt.droprate,
@@ -617,6 +646,7 @@ elif opt.use_efficient:
         linear_num=opt.linear_num,
     )
 elif opt.use_hr:
+    print("HRNet!")
     model = ft_net_hr(
         number_of_classes,
         opt.droprate,
@@ -624,13 +654,15 @@ elif opt.use_hr:
         linear_num=opt.linear_num,
     )
 elif opt.use_convnext:
+    print("ConvNext!")
     model = ft_net_convnext(
         number_of_classes,
         opt.droprate,
         circle=return_feature,
         linear_num=opt.linear_num,
     )
-else:
+elif opt.ibn:
+    print("Resnet IBN!")
     model = ft_net(
         number_of_classes,
         opt.droprate,
@@ -639,34 +671,71 @@ else:
         ibn=opt.ibn,
         linear_num=opt.linear_num,
     )
-
-if opt.PCB:
+elif opt.PCB:
+    print("PCB!")
     model = PCB(number_of_classes)
+else:
+    raise ValueError("No such model!")
 
 opt.nclasses = number_of_classes
 
-print(model)
+# print(model)
 
 # model to gpu
 model = model.cuda()
 
-optim_name = optim.SGD  # apex.optimizers.FusedSGD
-if opt.FSGD:  # apex is needed
+if opt.optimizer == "sgd":
+    optim_name = optim.SGD  # apex.optimizers.FusedSGD
+    print("Selected SGD!")
+elif opt.optimizer == "adam":
+    optim_name = optim.Adam
+    print("Selected Adam!")
+elif opt.optimizer == "adamw":
+    optim_name = optim.AdamW
+    print("Selected AdamW!")
+elif opt.FSGD:  # apex is needed
     optim_name = FusedSGD
+else:
+    raise ValueError("No such optimizer!")
 
 if not opt.PCB:
     ignored_params = list(map(id, model.classifier.parameters()))
     base_params = filter(lambda p: id(p) not in ignored_params, model.parameters())
     classifier_params = model.classifier.parameters()
-    optimizer_ft = optim_name(
-        [
-            {"params": base_params, "lr": 0.1 * opt.lr},
-            {"params": classifier_params, "lr": opt.lr},
-        ],
-        weight_decay=opt.weight_decay,
-        momentum=0.9,
-        nesterov=True,
-    )
+    if opt.cool_lr:
+        if opt.optimizer == "sgd" or opt.FSGD:
+            optimizer_ft = optim_name(
+                [
+                    {"params": base_params, "lr": 0.1 * opt.lr},
+                    {"params": classifier_params, "lr": opt.lr},
+                ],
+                weight_decay=opt.weight_decay,
+                momentum=0.9,
+                nesterov=True,
+            )
+        else:
+            optimizer_ft = optim_name(
+                [
+                    {"params": base_params, "lr": 0.1 * opt.lr},
+                    {"params": classifier_params, "lr": opt.lr},
+                ],
+                weight_decay=opt.weight_decay,
+            )
+    else:
+        if opt.optimizer == "sgd" or opt.FSGD:
+            optimizer_ft = optim_name(
+                params=model.parameters(),
+                lr=opt.lr,
+                weight_decay=opt.weight_decay,
+                momentum=0.9,
+                nesterov=True,
+            )
+        else:
+            optimizer_ft = optim_name(
+                params=model.parameters(),
+                lr=opt.lr,
+                weight_decay=opt.weight_decay,
+            )
 else:
     ignored_params = list(map(id, model.model.fc.parameters()))
     ignored_params += (
@@ -681,19 +750,45 @@ else:
     )
     base_params = filter(lambda p: id(p) not in ignored_params, model.parameters())
     classifier_params = filter(lambda p: id(p) in ignored_params, model.parameters())
-    optimizer_ft = optim_name(
-        [
-            {"params": base_params, "lr": 0.1 * opt.lr},
-            {"params": classifier_params, "lr": opt.lr},
-        ],
-        weight_decay=opt.weight_decay,
-        momentum=0.9,
-        nesterov=True,
-    )
+    if opt.cool_lr:
+        if opt.optimizer == "sgd" or opt.FSGD:
+            optimizer_ft = optim_name(
+                [
+                    {"params": base_params, "lr": 0.1 * opt.lr},
+                    {"params": classifier_params, "lr": opt.lr},
+                ],
+                weight_decay=opt.weight_decay,
+                momentum=0.9,
+                nesterov=True,
+            )
+        else:
+            optimizer_ft = optim_name(
+                [
+                    {"params": base_params, "lr": 0.1 * opt.lr},
+                    {"params": classifier_params, "lr": opt.lr},
+                ],
+                weight_decay=opt.weight_decay,
+            )
+    else:
+        if opt.optimizer == "sgd" or opt.FSGD:
+            optimizer_ft = optim_name(
+                params=model.parameters(),
+                lr=opt.lr,
+                weight_decay=opt.weight_decay,
+                momentum=0.9,
+                nesterov=True,
+            )
+        else:
+            optimizer_ft = optim_name(
+                params=model.parameters(),
+                lr=opt.lr,
+                weight_decay=opt.weight_decay,
+            )
 
 # Decay LR by a factor of 0.1 every 40 epochs
 exp_lr_scheduler = optim.lr_scheduler.StepLR(
-    optimizer_ft, step_size=opt.total_epoch * 2 // 3, gamma=0.1
+    # optimizer_ft, step_size=opt.total_epoch * 2 // 3, gamma=0.1
+    optimizer_ft, step_size=9, gamma=0.1
 )
 if opt.cosine:
     exp_lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(
@@ -707,6 +802,9 @@ if opt.cosine:
 # It should take around 1-2 hours on GPU.
 #
 dir_name = os.path.join("experiments", name)
+
+tb = SummaryWriter(dir_name)
+
 if not os.path.isdir(dir_name):
     os.makedirs(dir_name)
 
@@ -726,5 +824,5 @@ if fp16:
     model, optimizer_ft = amp.initialize(model, optimizer_ft, opt_level="O1")
 
 model = train_model(
-    model, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=opt.total_epoch
+    model, criterion, optimizer_ft, exp_lr_scheduler, tb, num_epochs=opt.total_epoch
 )

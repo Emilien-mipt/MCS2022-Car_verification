@@ -14,7 +14,7 @@ from data.augmentations import get_val_aug
 from data.dataset import CarsDataset
 from utils import convert_dict_to_tuple
 
-from models.models import ft_net
+from models.models import ft_net, EffNetv2
 
 
 def main(args: argparse.Namespace) -> None:
@@ -28,12 +28,11 @@ def main(args: argparse.Namespace) -> None:
 
     # getting model and checkpoint
     print("Creating model and loading checkpoint")
-    model = ft_net(
+    model = EffNetv2(
         exp_cfg.dataset.num_of_classes,
+        pretrained=False,
         droprate=0,
-        stride=2,
         circle=True,
-        ibn=True,
         linear_num=512,
     )
     checkpoint = torch.load(args.checkpoint_path, map_location="cuda")
@@ -43,7 +42,6 @@ def main(args: argparse.Namespace) -> None:
         name = k.replace("module.", "")
         new_state_dict[name] = v
 
-    model.fc = torch.nn.Identity()
     model.load_state_dict(new_state_dict)
     model.eval()
     model.cuda()

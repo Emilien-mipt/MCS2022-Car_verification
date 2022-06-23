@@ -1,7 +1,8 @@
-exp_name: 'ibn_arcface'
+exp_name: 'EffNetv2_small_bs128'
 outdir: './experiments/'
 
 num_gpu: 1
+gpu_id: 0
 
 dataset:
     root: './datasets/CompCars/data/image/'

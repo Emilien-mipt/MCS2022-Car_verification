@@ -24,8 +24,8 @@ def get_val_aug(config):
     if config.dataset.augmentations_valid == "default":
         val_augs = tv.transforms.Compose(
             [
-                tv.transforms.Resize(256),
-                tv.transforms.CenterCrop(config.dataset.input_size),
+                tv.transforms.Resize(size=(224, 224)),
+                # tv.transforms.CenterCrop(config.dataset.input_size),
                 tv.transforms.ToTensor(),
                 normalize,
             ]
