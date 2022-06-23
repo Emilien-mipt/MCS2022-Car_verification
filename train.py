@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from models.head import l2_norm
+from models.head import convert_label_to_similarity, l2_norm
 from utils import AverageMeter, accuracy, warm_up_lr
 
 
@@ -62,22 +62,21 @@ def train(
 
         if selected_losses:
             features = model.extract_features(x)
-            features_norm = torch.norm(features, p=2, dim=1, keepdim=True)
-            print(features_norm.shape)
-            features = features.div(features_norm.expand_as(features))
-            print(features.shape)
-            print(y.shape)
+            features = l2_norm(features)
+
             for loss_name, additional_loss in selected_losses.items():
-                print("loss_name: ", loss_name)
-                print(additional_loss)
                 if (
                     loss_name == "arcface"
                     or loss_name == "cosface"
-                    or loss_name == "circle"
                     or loss_name == "instance"
                     or loss_name == "sphere"
                 ):
                     loss += additional_loss(features, y) / num_of_samples
+                elif loss_name == "circle":
+                    loss += (
+                        additional_loss(*convert_label_to_similarity(features, y))
+                        / num_of_samples
+                    )
                 else:
                     loss += additional_loss(features, y)
 
@@ -161,11 +160,11 @@ def validation(
                 features = l2_norm(features)
                 for loss_name, additional_loss in selected_losses.items():
                     if (
-                            loss_name == "arcface"
-                            or loss_name == "cosface"
-                            or loss_name == "circle"
-                            or loss_name == "instance"
-                            or loss_name == "sphere"
+                        loss_name == "arcface"
+                        or loss_name == "cosface"
+                        or loss_name == "circle"
+                        or loss_name == "instance"
+                        or loss_name == "sphere"
                     ):
                         loss += additional_loss(features, y) / num_of_samples
                     else:

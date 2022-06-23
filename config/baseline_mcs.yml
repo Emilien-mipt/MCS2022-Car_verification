@@ -24,7 +24,7 @@ model:
     use_fc: True
     fc_dim: 512
     dropout: 0.5
-    loss_modules: ["contrast", "circle"]
+    loss_modules: ["circle", "contrast"]
 
 train:
     full_training: False # Train on fuill data without validation
