@@ -11,7 +11,7 @@ class MCSNet(nn.Module):
         model_name,
         use_fc=False,
         fc_dim=512,
-        dropout=0.0,
+        dropout=0.5,
         loss_module="softmax",
         s=64.0,
         margin=0.50,
