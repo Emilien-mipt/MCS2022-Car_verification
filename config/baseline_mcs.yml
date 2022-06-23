@@ -1,4 +1,4 @@
-exp_name: 'efficientnetv2_rw_s_arcface_nocrop_withval'
+exp_name: 'efficientnetv2_rw_s_arcface_nocrop_withval_correct'
 outdir: './experiments/'
 
 num_gpu: 1
@@ -6,8 +6,6 @@ gpu_id: 0
 
 dataset:
     root: './datasets/CompCars/data/image/'
-    # train_list: './datasets/CompCars/annotation/train.txt'
-    train_list: './datasets/CompCars/annotation/train_full.txt'
     val_list: './datasets/CompCars/annotation/val.txt'
     seed: 42
     num_of_classes: 1716
