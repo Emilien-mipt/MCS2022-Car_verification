@@ -131,6 +131,7 @@ def main(args: argparse.Namespace) -> None:
                 model=net,
                 val_loader=val_loader,
                 criterion=criterion,
+                selected_losses=selected_losses,
                 epoch=epoch,
                 device=device,
             )
