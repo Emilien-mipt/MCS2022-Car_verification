@@ -1,20 +1,35 @@
 from __future__ import division, print_function
 
 import math
+from typing import Tuple
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import Tensor, nn
 from torch.nn import Parameter
 
 # Support: ['Softmax', 'ArcFace', 'CosFace', 'SphereFace', 'Am_softmax']
 
 
-def l2_norm(input, axis=1):
-    norm = torch.norm(input, 2, axis, True)
-    output = torch.div(input, norm)
+def convert_label_to_similarity(
+    normed_feature: Tensor, label: Tensor
+) -> Tuple[Tensor, Tensor]:
+    similarity_matrix = normed_feature @ normed_feature.transpose(1, 0)
+    label_matrix = label.unsqueeze(1) == label.unsqueeze(0)
 
-    return output
+    positive_matrix = label_matrix.triu(diagonal=1)
+    negative_matrix = label_matrix.logical_not().triu(diagonal=1)
+
+    similarity_matrix = similarity_matrix.view(-1)
+    positive_matrix = positive_matrix.view(-1)
+    negative_matrix = negative_matrix.view(-1)
+    return similarity_matrix[positive_matrix], similarity_matrix[negative_matrix]
+
+
+def l2_norm(vector, p=2, axis=1, eps=0):
+    fnorm = torch.norm(vector, p=p, dim=axis, keepdim=True) + eps
+    vector = vector.div(fnorm.expand_as(vector))
+    return vector
 
 
 class Softmax(nn.Module):
@@ -356,3 +371,48 @@ class AdaCos(nn.Module):
         output *= self.s
 
         return output
+
+
+class CircleLoss(nn.Module):
+    """Circle loss from https://github.com/TinyZeaMays/CircleLoss/blob/master/circle_loss.py"""
+
+    def __init__(self, m: float, gamma: float) -> None:
+        super(CircleLoss, self).__init__()
+        self.m = m
+        self.gamma = gamma
+        self.soft_plus = nn.Softplus()
+
+    def forward(self, sp: Tensor, sn: Tensor) -> Tensor:
+        ap = torch.clamp_min(-sp.detach() + 1 + self.m, min=0.0)
+        an = torch.clamp_min(sn.detach() + self.m, min=0.0)
+
+        delta_p = 1 - self.m
+        delta_n = self.m
+
+        logit_p = -ap * (sp - delta_p) * self.gamma
+        logit_n = an * (sn - delta_n) * self.gamma
+
+        loss = self.soft_plus(
+            torch.logsumexp(logit_n, dim=0) + torch.logsumexp(logit_p, dim=0)
+        )
+        return loss
+
+
+class InstanceLoss(nn.Module):
+    def __init__(self, gamma=1) -> None:
+        super(InstanceLoss, self).__init__()
+        self.gamma = gamma
+
+    def forward(self, feature, label=None) -> Tensor:
+        # Dual-Path Convolutional Image-Text Embeddings with Instance Loss, ACM TOMM 2020
+        # https://zdzheng.xyz/files/TOMM20.pdf
+        # using cross-entropy loss for every sample if label is not available. else use given label.
+        normed_feature = l2_norm(feature)
+        sim1 = torch.mm(normed_feature * self.gamma, torch.t(normed_feature))
+        # sim2 = sim1.t()
+        if label is None:
+            sim_label = torch.arange(sim1.size(0)).cuda().detach()
+        else:
+            _, sim_label = torch.unique(label, return_inverse=True)
+        loss = F.cross_entropy(sim1, sim_label)  # + F.cross_entropy(sim2, sim_label)
+        return loss

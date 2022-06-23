@@ -50,6 +50,7 @@ class FCLayer(nn.Module):
         linear_block = nn.Sequential(*linear_block)
         linear_block.apply(weights_init_kaiming)
         self.fc_layer = linear_block
+        self.linear = linear
 
     def forward(self, x):
         x = self.fc_layer(x)
