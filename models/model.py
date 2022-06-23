@@ -121,3 +121,42 @@ class MCSNet(nn.Module):
         feature = self.extract_features(x)
         logits = self.classifier(feature)
         return logits
+
+
+class MCSNetTransformers(nn.Module):
+    def __init__(
+        self,
+        n_classes,
+        model_name,
+        fc_dim=512,
+        dropout=0.5,
+        relu=False,
+        bnorm=True,
+        pretrained=True,
+    ):
+        super(MCSNetTransformers, self).__init__()
+        print("Building Model Backbone for {} model".format(model_name))
+        self.backbone = timm.create_model(model_name, pretrained=pretrained)
+        print("Backbone has been built!")
+
+        final_in_features = self.backbone.head.in_features
+        self.backbone.head = nn.Identity()
+
+        self.fc_layer = FCLayer(
+            input_dim=final_in_features,
+            droprate=dropout,
+            relu=relu,
+            bnorm=bnorm,
+            linear=fc_dim,
+        )
+        self.classifier = Classifier(input_dim=fc_dim, class_num=n_classes)
+
+    def extract_features(self, x):
+        x = self.backbone.forward_features()
+        features = self.fc_layer(x)
+        return features
+
+    def forward(self, x):
+        feature = self.extract_features(x)
+        logits = self.classifier(feature)
+        return logits

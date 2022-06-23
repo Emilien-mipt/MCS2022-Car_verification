@@ -3,7 +3,6 @@ import os
 import os.path as osp
 import shutil
 import sys
-import warnings
 
 import torch
 import yaml
@@ -14,7 +13,7 @@ from tqdm import tqdm
 import utils
 from data import get_dataloader
 from models.head import CircleLoss, InstanceLoss
-from models.model import MCSNet
+from models.model import MCSNet, MCSNetTransformers
 from train import train, validation
 from utils import (add_weight_decay, convert_dict_to_tuple, get_optimizer,
                    get_scheduler, set_seed)
