@@ -31,6 +31,7 @@ def main(args: argparse.Namespace) -> None:
         "model_name": exp_cfg.model.model_name,
         "pretrained": False,
         "use_fc": exp_cfg.model.use_fc,
+        "dropout": 0,
         "fc_dim": exp_cfg.model.fc_dim,
         "loss_module": exp_cfg.model.loss_module,
         "s": exp_cfg.model.s,
