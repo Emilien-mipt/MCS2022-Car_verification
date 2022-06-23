@@ -56,8 +56,11 @@ def main(args: argparse.Namespace) -> None:
     print("Loading model...")
     model_params = {
         "model_name": config.model.model_name,
-        "pretrained": config.model.pretrained,
         "fc_dim": config.model.fc_dim,
+        "dropout": 0.5,
+        "relu": False,
+        "bnorm": True,
+        "pretrained": config.model.pretrained,
     }
     print("Model params: ", model_params)
     net = MCSNet(n_classes=n_classes, **model_params)

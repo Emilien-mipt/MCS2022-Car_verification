@@ -29,17 +29,14 @@ def main(args: argparse.Namespace) -> None:
     print("Creating model and loading checkpoint")
     model_params = {
         "model_name": exp_cfg.model.model_name,
-        "pretrained": False,
-        "use_fc": exp_cfg.model.use_fc,
         "fc_dim": exp_cfg.model.fc_dim,
-        "loss_module": exp_cfg.model.loss_module,
-        "s": exp_cfg.model.s,
-        "margin": exp_cfg.model.margin,
-        "theta_zero": exp_cfg.model.theta_zero,
+        "dropout": 0.,
+        "relu": False,
+        "bnorm": True,
+        "pretrained": False,
     }
     model = MCSNet(
         n_classes=exp_cfg.dataset.num_of_classes,
-        device_id=exp_cfg.gpu_id,
         **model_params,
     )
     checkpoint = torch.load(args.checkpoint_path, map_location="cuda")["state_dict"]

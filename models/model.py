@@ -81,7 +81,7 @@ class MCSNet(nn.Module):
         n_classes,
         model_name,
         fc_dim=512,
-        dropout=0.0,
+        dropout=0.5,
         relu=False,
         bnorm=True,
         pretrained=True,
