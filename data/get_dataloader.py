@@ -18,6 +18,12 @@ def get_dataloaders(config):
     :param config:
     :return:
     """
+    if config.train.full_training:
+        print("Training on full data!")
+        train_list = './datasets/CompCars/annotation/train_full.txt'
+    else:
+        train_list = './datasets/CompCars/annotation/train.txt'
+
     print("Preparing train reader...")
     if config.train.full_training:
         print("Training on full data!")
