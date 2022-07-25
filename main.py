@@ -6,12 +6,14 @@ import sys
 
 import torch
 import yaml
+from pytorch_metric_learning import losses
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 import utils
 from data import get_dataloader
-from models.model import MCSNet
+from models.head import CircleLoss, InstanceLoss
+from models.model import MCSNet, MCSNetTransformers
 from train import train, validation
 from utils import (add_weight_decay, convert_dict_to_tuple, get_optimizer,
                    get_scheduler, set_seed)
@@ -34,6 +36,8 @@ def main(args: argparse.Namespace) -> None:
     seed = config.dataset.seed
     set_seed(seed)
 
+    n_classes = config.dataset.num_of_classes
+
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = True
 
@@ -51,20 +55,41 @@ def main(args: argparse.Namespace) -> None:
     print("Loading model...")
     model_params = {
         "model_name": config.model.model_name,
-        "use_fc": config.model.use_fc,
         "fc_dim": config.model.fc_dim,
-        "dropout": config.model.dropout,
-        "loss_module": config.model.loss_module,
-        "s": config.model.s,
-        "margin": config.model.margin,
-        "theta_zero": config.model.theta_zero,
+        "dropout": 0.5,
+        "relu": False,
+        "bnorm": True,
         "pretrained": config.model.pretrained,
     }
     print("Model params: ", model_params)
-    net = MCSNet(
-        n_classes=config.dataset.num_of_classes, device_id=device_id, **model_params
-    )
+    net = MCSNet(n_classes=n_classes, **model_params)
     net.to(device)
+
+    embedding_size = net.fc_layer.linear
+
+    print(f"Embedding size: {embedding_size}")
+
+    # Dictionary with losses for metric learning. Set parameters here:
+    loss_dict = {
+        "arcface": losses.ArcFaceLoss(
+            num_classes=n_classes, embedding_size=embedding_size
+        ),
+        "cosface": losses.CosFaceLoss(
+            num_classes=n_classes, embedding_size=embedding_size
+        ),
+        "circle": CircleLoss(m=0.25, gamma=32),
+        "lifted": losses.GeneralizedLiftedStructureLoss(neg_margin=1, pos_margin=0),
+        "contrast": losses.ContrastiveLoss(pos_margin=0, neg_margin=1),
+        "instance": InstanceLoss(gamma=32),
+        "sphere": losses.SphereFaceLoss(
+            num_classes=n_classes, embedding_size=embedding_size, margin=4
+        ),
+    }
+
+    selected_losses = {
+        loss: loss_dict[loss] for loss in loss_dict if loss in config.model.loss_modules
+    }
+    print("Selected losses:", selected_losses.keys())
 
     criterion = torch.nn.CrossEntropyLoss().to("cuda")
 
@@ -86,6 +111,7 @@ def main(args: argparse.Namespace) -> None:
     for epoch in train_epoch:
         avg_train_loss, avg_train_acc, avg_train_top5 = train(
             model=net,
+            selected_losses=selected_losses,
             train_loader=train_loader,
             criterion=criterion,
             optimizer=optimizer,
@@ -107,6 +133,7 @@ def main(args: argparse.Namespace) -> None:
                 model=net,
                 val_loader=val_loader,
                 criterion=criterion,
+                selected_losses=selected_losses,
                 epoch=epoch,
                 device=device,
             )

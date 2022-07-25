@@ -2,11 +2,13 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+from models.head import convert_label_to_similarity, l2_norm
 from utils import AverageMeter, accuracy, warm_up_lr
 
 
 def train(
     model: torch.nn.Module,
+    selected_losses: dict,
     train_loader: torch.utils.data.DataLoader,
     criterion: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
@@ -18,6 +20,7 @@ def train(
     """
     Model training function for one epoch
     :param model: model architecture
+    :param selected_losses: losses that will are used to distinguish embeddings after training
     :param train_loader: dataloader for batch generation
     :param criterion: selected criterion for calculating the loss function
     :param optimizer: selected optimizer for updating weights
@@ -53,17 +56,38 @@ def train(
 
         x = x.to(device).to(memory_format=torch.contiguous_format)
         y = y.to(device)
-        out = model(x, y)
-        loss = criterion(out, y)
+
+        logits = model(x)
+        loss = criterion(logits, y)
+
+        if selected_losses:
+            features = model.extract_features(x)
+            features = l2_norm(features)
+
+            for loss_name, additional_loss in selected_losses.items():
+                if (
+                    loss_name == "arcface"
+                    or loss_name == "cosface"
+                    or loss_name == "instance"
+                    or loss_name == "sphere"
+                ):
+                    loss += additional_loss(features, y) / num_of_samples
+                elif loss_name == "circle":
+                    loss += (
+                        additional_loss(*convert_label_to_similarity(features, y))
+                        / num_of_samples
+                    )
+                else:
+                    loss += additional_loss(features, y)
 
         loss_stat.update(loss.detach().cpu().item(), num_of_samples)
-        _, prec5 = accuracy(out.data, y, topk=(1, 5))
+        _, prec5 = accuracy(logits.data, y, topk=(1, 5))
         top5_stat.update(prec5.data.item(), num_of_samples)
 
         loss.backward()
         optimizer.step()
 
-        scores = torch.softmax(out, dim=1).detach().cpu().numpy()
+        scores = torch.softmax(logits, dim=1).detach().cpu().numpy()
         predict = np.argmax(scores, axis=1)
         gt = y.detach().cpu().numpy()
 
@@ -100,6 +124,7 @@ def validation(
     model: torch.nn.Module,
     val_loader: torch.utils.data.DataLoader,
     criterion: torch.nn.Module,
+    selected_losses: dict,
     epoch,
     device,
 ):
@@ -108,6 +133,7 @@ def validation(
     :param model: model architecture
     :param val_loader: dataloader for batch generation
     :param criterion: selected criterion for calculating the loss function
+    :param selected_losses:
     :param epoch:
     :param device:
     :return: float: avg acc
@@ -126,14 +152,29 @@ def validation(
             x = x.to(device).to(memory_format=torch.contiguous_format)
             y = y.to(device)
 
-            out = model(x, y)
-            loss = criterion(out, y)
+            logits = model(x, y)
+            loss = criterion(logits, y)
+
+            if selected_losses:
+                features = model.extract_features(x)
+                features = l2_norm(features)
+                for loss_name, additional_loss in selected_losses.items():
+                    if (
+                        loss_name == "arcface"
+                        or loss_name == "cosface"
+                        or loss_name == "circle"
+                        or loss_name == "instance"
+                        or loss_name == "sphere"
+                    ):
+                        loss += additional_loss(features, y) / num_of_samples
+                    else:
+                        loss += additional_loss(features, y)
 
             loss_stat.update(loss.detach().cpu().item(), num_of_samples)
-            _, prec5 = accuracy(out.data, y, topk=(1, 5))
+            _, prec5 = accuracy(logits.data, y, topk=(1, 5))
             top5_stat.update(prec5.data.item(), num_of_samples)
 
-            scores = torch.softmax(out, dim=1).detach().cpu().numpy()
+            scores = torch.softmax(logits, dim=1).detach().cpu().numpy()
             predict = np.argmax(scores, axis=1)
             gt = y.detach().cpu().numpy()
 
