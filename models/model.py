@@ -152,7 +152,7 @@ class MCSNetTransformers(nn.Module):
         self.classifier = Classifier(input_dim=fc_dim, class_num=n_classes)
 
     def extract_features(self, x):
-        x = self.backbone.forward_features()
+        x = self.backbone.forward_features(x)
         features = self.fc_layer(x)
         return features
 

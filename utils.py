@@ -17,7 +17,7 @@ def convert_dict_to_tuple(dictionary):
 
 def save_checkpoint(model, model_name, epoch, outdir):
     """Saves checkpoint to disk"""
-    filename = f"{model_name}_best.pth"
+    filename = f"{model_name}_{epoch}.pth"
     directory = outdir
     filename = os.path.join(directory, filename)
     weights = model.state_dict()

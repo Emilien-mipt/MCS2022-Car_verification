@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+import time
 from collections import OrderedDict
 
 import numpy as np
@@ -12,7 +13,7 @@ from tqdm import tqdm
 
 from data.augmentations import get_val_aug
 from data.dataset import CarsDataset
-from models.model import MCSNet
+from models.model import MCSNet, MCSNetTransformers
 from utils import convert_dict_to_tuple
 
 
@@ -39,7 +40,7 @@ def main(args: argparse.Namespace) -> None:
         n_classes=exp_cfg.dataset.num_of_classes,
         **model_params,
     )
-    checkpoint = torch.load(args.checkpoint_path, map_location="cuda")["state_dict"]
+    checkpoint = torch.load(args.checkpoint_path, map_location="cuda")
 
     new_state_dict = OrderedDict()
     for k, v in checkpoint.items():
@@ -69,8 +70,12 @@ def main(args: argparse.Namespace) -> None:
     with torch.no_grad():
         for i, images in tqdm(enumerate(test_loader, 0), total=len(test_loader)):
             images = images.to("cuda")
+            start = time.time()
             outputs = model.extract_features(images)
+            end = time.time()
             outputs = outputs.data.cpu().numpy()
+
+            print("Inference time: ", end - start)
 
             if i == 0:
                 embeddings = outputs
