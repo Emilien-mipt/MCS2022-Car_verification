@@ -1,8 +1,8 @@
-exp_name: 'efficientnetv2_rw_s+circle+contrast_bs-32'
+exp_name: 'swin_small_patch4_window7_224+circle+contrast_bs-16'
 outdir: './experiments/'
 
 num_gpu: 1
-gpu_id: 0
+gpu_id: 1
 
 dataset:
     root: './datasets/CompCars/data/image/'
@@ -17,7 +17,7 @@ dataset:
 
 
 model:
-    model_name: 'efficientnetv2_rw_m'
+    model_name: 'swin_small_patch4_window7_224'
     pretrained: True
     fc_dim: 512
     dropout: 0.5
