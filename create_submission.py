@@ -31,7 +31,7 @@ def main(args: argparse.Namespace) -> None:
     model_params = {
         "model_name": exp_cfg.model.model_name,
         "fc_dim": exp_cfg.model.fc_dim,
-        "dropout": 0.,
+        "dropout": 0.0,
         "relu": False,
         "bnorm": True,
         "pretrained": False,
